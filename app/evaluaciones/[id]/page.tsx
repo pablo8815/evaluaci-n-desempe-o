@@ -1,33 +1,22 @@
-import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { EvaluationForm } from "@/components/EvaluationForm";
 
-async function getBaseUrl() {
-  const h = headers();
-  const host = h.get("host");
-
-  if (!host) {
-    return process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-  }
-
-  const isLocalhost = host.includes("localhost");
-  const protocol = isLocalhost ? "http" : "https";
-
-  return `${protocol}://${host}`;
-}
-
 async function getEvaluation(id: string) {
-  const baseUrl = await getBaseUrl();
+  try {
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_APP_URL}/api/evaluations/${id}`,
+      {
+        cache: "no-store",
+      }
+    );
 
-  const res = await fetch(`${baseUrl}/api/evaluations/${id}`, {
-    cache: "no-store",
-  });
+    if (!res.ok) return null;
 
-  if (!res.ok) {
+    return res.json();
+  } catch (error) {
+    console.error("Error fetching evaluation:", error);
     return null;
   }
-
-  return res.json();
 }
 
 export default async function EvaluationEditPage({
