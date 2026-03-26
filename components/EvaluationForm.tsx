@@ -14,9 +14,6 @@ import type {
   EvaluationDocument,
 } from "@/types/evaluation";
 
-const btnPrimary =
-  "inline-flex items-center justify-center rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-50";
-
 const btnSecondary =
   "inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-800 shadow-sm transition hover:bg-slate-50 disabled:opacity-50";
 
@@ -45,46 +42,10 @@ function Alert({
   );
 }
 
-type PersistResponse = {
-  id?: string;
-  _id?: string;
-  evaluation?: {
-    id?: string;
-    _id?: string;
-  };
-};
-
 type EvaluationFormInitialData = EvaluationDocument & {
   id?: string;
   _id?: string;
 };
-
-function extractEvaluationId(data: unknown): string | undefined {
-  if (!data || typeof data !== "object") return undefined;
-
-  const value = data as PersistResponse;
-
-  if (typeof value.id === "string" && value.id.trim()) return value.id;
-  if (typeof value._id === "string" && value._id.trim()) return value._id;
-
-  if (value.evaluation && typeof value.evaluation === "object") {
-    if (
-      typeof value.evaluation.id === "string" &&
-      value.evaluation.id.trim()
-    ) {
-      return value.evaluation.id;
-    }
-
-    if (
-      typeof value.evaluation._id === "string" &&
-      value.evaluation._id.trim()
-    ) {
-      return value.evaluation._id;
-    }
-  }
-
-  return undefined;
-}
 
 export function EvaluationForm({
   initialData,
@@ -99,9 +60,6 @@ export function EvaluationForm({
   const [employee, setEmployee] = useState<EmployeeInfo>(initial.employee);
   const [date, setDate] = useState(initial.date);
   const [sections, setSections] = useState(initial.sections);
-  const [evaluationId, setEvaluationId] = useState<string | undefined>(
-    initialData?.id ?? initialData?._id
-  );
   const [loading, setLoading] = useState(false);
   const [banner, setBanner] = useState<{
     type: "ok" | "err";
@@ -124,7 +82,6 @@ export function EvaluationForm({
     setEmployee(empty.employee);
     setDate(empty.date);
     setSections(empty.sections);
-    setEvaluationId(undefined);
   }, []);
 
   const waitForStateFlush = useCallback(
@@ -135,101 +92,18 @@ export function EvaluationForm({
     []
   );
 
-  const buildDocumentForPdf = useCallback((): EvaluationDocument => {
-    return {
-      employee,
-      date,
-      status: "draft",
-      sections,
-      totals: computeTotals(sections),
-    };
-  }, [employee, date, sections]);
-
-  const persistDraft = useCallback(async (): Promise<string> => {
-    const payload = {
-      employee,
-      date,
-      status: "draft" as const,
-      sections,
-    };
-
-    if (!evaluationId) {
-      const res = await fetch("/api/evaluations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      const data: unknown = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        const errorMessage =
-          data &&
-          typeof data === "object" &&
-          "error" in data &&
-          typeof (data as { error?: unknown }).error === "string"
-            ? (data as { error: string }).error
-            : "No se pudo crear el borrador";
-
-        throw new Error(errorMessage);
-      }
-
-      const newId = extractEvaluationId(data);
-
-      if (!newId) {
-        console.error("Respuesta POST /api/evaluations sin id:", data);
-        throw new Error("La API no devolvió el identificador del borrador");
-      }
-
-      setEvaluationId(newId);
-      return newId;
-    }
-
-    const res = await fetch(`/api/evaluations/${evaluationId}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    const data: unknown = await res.json().catch(() => ({}));
-
-    if (!res.ok) {
-      const errorMessage =
-        data &&
-        typeof data === "object" &&
-        "error" in data &&
-        typeof (data as { error?: unknown }).error === "string"
-          ? (data as { error: string }).error
-          : "No se pudo actualizar el borrador";
-
-      throw new Error(errorMessage);
-    }
-
-    const updatedId = extractEvaluationId(data) ?? evaluationId;
-
-    if (!updatedId) {
-      console.error("Respuesta PUT /api/evaluations/[id] sin id:", data);
-      throw new Error("No se pudo conservar el identificador de la evaluación");
-    }
-
-    setEvaluationId(updatedId);
-    return updatedId;
-  }, [employee, date, sections, evaluationId]);
-
-  const onSaveDraft = async () => {
-    setLoading(true);
-    setBanner(null);
-
-    try {
-      await waitForStateFlush();
-      const id = await persistDraft();
-      showOk(`Borrador guardado correctamente. ID: ${id}`);
-    } catch (e) {
-      showError(e instanceof Error ? e.message : "Error al guardar");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const buildDocumentForPdf = useCallback(
+    (status: EvaluationDocument["status"] = "finalized"): EvaluationDocument => {
+      return {
+        employee,
+        date,
+        status,
+        sections,
+        totals: computeTotals(sections),
+      };
+    },
+    [employee, date, sections]
+  );
 
   const onGeneratePdf = async () => {
     setLoading(true);
@@ -237,7 +111,7 @@ export function EvaluationForm({
 
     try {
       await waitForStateFlush();
-      const doc = buildDocumentForPdf();
+      const doc = buildDocumentForPdf("finalized");
 
       const res = await fetch("/api/evaluations/pdf", {
         method: "POST",
@@ -265,7 +139,7 @@ export function EvaluationForm({
         throw new Error("El PDF llegó vacío desde el servidor");
       }
 
-      const slug = collaboratorSlugForFilename(employee.name);
+      const slug = collaboratorSlugForFilename(employee.name || "colaborador");
       const downloadName = `evaluacion-${slug}.pdf`;
 
       const blob = new Blob([arrayBuffer], { type: "application/pdf" });
@@ -303,23 +177,18 @@ export function EvaluationForm({
 
     try {
       await waitForStateFlush();
-      const id = await persistDraft();
 
-      if (!id) {
-        throw new Error("No se pudo obtener el identificador de la evaluación");
-      }
-
-      const evaluation = {
+      const payload = {
         employee,
         date,
         status: "finalized" as const,
         sections,
       };
 
-      const res = await fetch("/api/evaluations/finalize", {
+      const res = await fetch("/api/evaluations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, evaluation }),
+        body: JSON.stringify(payload),
       });
 
       const data: unknown = await res.json().catch(() => ({}));
@@ -337,9 +206,7 @@ export function EvaluationForm({
       }
 
       resetForm();
-      showOk(
-        "Evaluación finalizada y guardada. El formulario se reinició para una nueva captura."
-      );
+      showOk("Evaluación finalizada y guardada correctamente.");
     } catch (e) {
       showError(e instanceof Error ? e.message : "Error al finalizar");
     } finally {
@@ -382,13 +249,11 @@ export function EvaluationForm({
             INNOVA
           </p>
           <h1 className="mt-1 text-2xl font-bold text-slate-900 sm:text-3xl">
-            {evaluationId
-              ? "Editar evaluación de desempeño"
-              : "Nueva evaluación de desempeño"}
+            Nueva evaluación de desempeño
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-slate-600">
             Captura manual del instrumento. Los totales se calculan en tiempo real;
-            puedes guardar borradores, generar el PDF y finalizar cuando esté completa.
+            puedes generar el PDF y finalizar cuando esté completa.
           </p>
         </div>
 
@@ -417,15 +282,6 @@ export function EvaluationForm({
         <div className="flex flex-wrap gap-3">
           <button
             type="button"
-            className={btnPrimary}
-            disabled={loading || isFinalized}
-            onClick={() => void onSaveDraft()}
-          >
-            Guardar borrador
-          </button>
-
-          <button
-            type="button"
             className={btnSecondary}
             disabled={loading}
             onClick={() => void onGeneratePdf()}
@@ -441,15 +297,6 @@ export function EvaluationForm({
           >
             Finalizar y limpiar
           </button>
-
-          {evaluationId ? (
-            <span className="self-center text-xs text-slate-500">
-              ID:{" "}
-              <code className="rounded bg-slate-100 px-1 py-0.5">
-                {evaluationId}
-              </code>
-            </span>
-          ) : null}
         </div>
 
         <div className="space-y-6">
