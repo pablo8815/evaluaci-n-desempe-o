@@ -1,54 +1,34 @@
 import { NextResponse } from "next/server";
-import { computeTotals } from "@/lib/calculations";
-import { buildEvaluationPdfBytes } from "@/lib/pdf";
-import { collaboratorSlugForFilename } from "@/lib/collaborator-filename";
-import type { EvaluationDocument } from "@/types/evaluation";
+import { evaluationToClient } from "@/lib/evaluation-db";
+import {
+  EVALUATIONS_COLLECTION,
+  getEvaluationsDb,
+} from "@/lib/mongodb";
 
 export const runtime = "nodejs";
 
-export async function POST(request: Request) {
+export async function GET() {
   try {
-    const data = (await request.json()) as EvaluationDocument;
+    const db = await getEvaluationsDb();
 
-    if (!data?.sections?.length) {
-      return NextResponse.json(
-        { error: "Payload incompleto" },
-        { status: 400 }
-      );
-    }
+    const rows = await db
+      .collection(EVALUATIONS_COLLECTION)
+      .find({})
+      .sort({ createdAt: -1 })
+      .toArray();
 
-    const totals = computeTotals(data.sections);
-    const payload: EvaluationDocument = { ...data, totals };
-
-    const bytes = await buildEvaluationPdfBytes(payload);
-
-    if (!bytes || bytes.length === 0) {
-      return NextResponse.json(
-        { error: "El PDF se generó vacío" },
-        { status: 500 }
-      );
-    }
-
-    const slug = collaboratorSlugForFilename(data.employee?.name || "sin-nombre");
-    const filenameAscii = `evaluacion-${slug}.pdf`;
-
-    return new Response(Buffer.from(bytes), {
-      status: 200,
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="${filenameAscii}"`,
-        "Content-Length": String(bytes.length),
-        "Cache-Control": "no-store, no-cache, must-revalidate",
-        Pragma: "no-cache",
-        Expires: "0",
-      },
+    return NextResponse.json({
+      evaluations: rows.map((row) => evaluationToClient(row)),
     });
   } catch (e) {
-    console.error("Error al generar PDF:", e);
+    console.error("GET /api/evaluations error:", e);
 
     const message =
-      e instanceof Error ? e.message : "Error interno al generar PDF";
+      e instanceof Error ? e.message : "Error al listar evaluaciones";
 
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      { error: message, evaluations: [] },
+      { status: 500 }
+    );
   }
 }
