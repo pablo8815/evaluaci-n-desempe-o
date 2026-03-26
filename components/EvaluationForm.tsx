@@ -45,6 +45,17 @@ function Alert({
   );
 }
 
+type PersistResponse = {
+  id?: string;
+  _id?: string;
+};
+
+function extractEvaluationId(data: PersistResponse | Record<string, unknown>): string | undefined {
+  if (typeof data.id === "string" && data.id.trim()) return data.id;
+  if (typeof data._id === "string" && data._id.trim()) return data._id;
+  return undefined;
+}
+
 export function EvaluationForm() {
   const initial = useMemo(() => createEmptyEvaluationDraft(), []);
   const [employee, setEmployee] = useState<EmployeeInfo>(initial.employee);
@@ -85,7 +96,7 @@ export function EvaluationForm() {
     };
   }, [employee, date, sections]);
 
-  const persistDraft = useCallback(async (): Promise<string | undefined> => {
+  const persistDraft = useCallback(async (): Promise<string> => {
     const payload = {
       employee,
       date,
@@ -110,8 +121,14 @@ export function EvaluationForm() {
         );
       }
 
-      setEvaluationId(data._id);
-      return data._id as string;
+      const newId = extractEvaluationId(data);
+
+      if (!newId) {
+        throw new Error("La API no devolvió el identificador del borrador");
+      }
+
+      setEvaluationId(newId);
+      return newId;
     }
 
     const res = await fetch(`/api/evaluations/${evaluationId}`, {
@@ -130,7 +147,14 @@ export function EvaluationForm() {
       );
     }
 
-    return evaluationId;
+    const updatedId = extractEvaluationId(data) ?? evaluationId;
+
+    if (!updatedId) {
+      throw new Error("No se pudo conservar el identificador de la evaluación");
+    }
+
+    setEvaluationId(updatedId);
+    return updatedId;
   }, [employee, date, sections, evaluationId]);
 
   const onSaveDraft = async () => {
@@ -150,55 +174,49 @@ export function EvaluationForm() {
   const onGeneratePdf = async () => {
     setLoading(true);
     setBanner(null);
-  
+
     try {
       const doc = buildDocumentForPdf();
-  
+
       const res = await fetch("/api/evaluations/pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(doc),
         cache: "no-store",
       });
-  
-      console.log("PDF response status:", res.status);
-      console.log("PDF content-type:", res.headers.get("content-type"));
-      console.log("PDF content-length:", res.headers.get("content-length"));
-  
+
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(
           typeof data.error === "string" ? data.error : "Error al generar PDF"
         );
       }
-  
+
       const arrayBuffer = await res.arrayBuffer();
-      console.log("ArrayBuffer byteLength:", arrayBuffer.byteLength);
-  
+
       if (!arrayBuffer.byteLength) {
         throw new Error("El PDF llegó vacío desde el servidor");
       }
-  
+
       const slug = collaboratorSlugForFilename(employee.name);
       const downloadName = `evaluacion-${slug}.pdf`;
-  
+
       const blob = new Blob([arrayBuffer], { type: "application/pdf" });
-      console.log("Blob size:", blob.size);
-  
       const url = window.URL.createObjectURL(blob);
+
       window.open(url, "_blank");
-  
+
       const a = document.createElement("a");
       a.href = url;
       a.download = downloadName;
       document.body.appendChild(a);
       a.click();
       a.remove();
-  
+
       setTimeout(() => {
         window.URL.revokeObjectURL(url);
       }, 5000);
-  
+
       showOk("PDF generado correctamente.");
     } catch (e) {
       showError(e instanceof Error ? e.message : "Error al generar PDF");
@@ -226,7 +244,7 @@ export function EvaluationForm() {
       const evaluation = {
         employee,
         date,
-        status: "draft" as const,
+        status: "finalized" as const,
         sections,
       };
 
