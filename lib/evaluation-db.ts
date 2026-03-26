@@ -10,10 +10,13 @@ function toIso(d: unknown): string | undefined {
 /** Convierte documento Mongo a forma enviada al cliente. */
 export function evaluationToClient(
   doc: WithId<Document> | Record<string, unknown>,
-): EvaluationDocument {
+): EvaluationDocument & { id: string; _id: string } {
   const d = doc as Record<string, unknown>;
+  const mongoId = String(d._id ?? "");
+
   return {
-    _id: String(d._id),
+    id: mongoId,
+    _id: mongoId,
     employee: d.employee as EvaluationDocument["employee"],
     date: String(d.date ?? ""),
     status: d.status as EvaluationDocument["status"],
