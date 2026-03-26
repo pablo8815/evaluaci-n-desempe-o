@@ -4,6 +4,11 @@ import type { EvaluationDocument } from "@/types/evaluation";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
+type EvaluationListItem = EvaluationDocument & {
+  id?: string;
+  _id?: string;
+};
+
 function formatDate(iso?: string | null) {
   if (!iso) return "—";
   const d = new Date(iso);
@@ -19,8 +24,12 @@ function statusLabel(s: EvaluationDocument["status"]) {
   return s === "finalized" ? "Finalizada" : "Borrador";
 }
 
+function getEvaluationId(ev: EvaluationListItem) {
+  return ev.id ?? ev._id ?? "";
+}
+
 export default function EvaluacionesListPage() {
-  const [rows, setRows] = useState<EvaluationDocument[]>([]);
+  const [rows, setRows] = useState<EvaluationListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,8 +38,12 @@ export default function EvaluacionesListPage() {
     setError(null);
 
     try {
-      const res = await fetch("/api/evaluations");
-      const data = await res.json();
+      const res = await fetch(`/api/evaluations?ts=${Date.now()}`, {
+        method: "GET",
+        cache: "no-store",
+      });
+
+      const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
         throw new Error(
@@ -38,7 +51,7 @@ export default function EvaluacionesListPage() {
         );
       }
 
-      setRows(data.evaluations ?? []);
+      setRows(Array.isArray(data.evaluations) ? data.evaluations : []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar evaluaciones");
     } finally {
@@ -135,63 +148,74 @@ export default function EvaluacionesListPage() {
                     </td>
                   </tr>
                 ) : (
-                  rows.map((ev) => (
-                    <tr key={ev._id} className="hover:bg-slate-50/80">
-                      <td className="px-4 py-3 font-medium text-slate-900">
-                        {ev.employee.name || "—"}
-                      </td>
+                  rows.map((ev) => {
+                    const evaluationId = getEvaluationId(ev);
 
-                      <td className="px-4 py-3 text-slate-700">
-                        {ev.employee.position || "—"}
-                      </td>
+                    return (
+                      <tr
+                        key={evaluationId || `${ev.employee.name}-${ev.date}`}
+                        className="hover:bg-slate-50/80"
+                      >
+                        <td className="px-4 py-3 font-medium text-slate-900">
+                          {ev.employee?.name || "—"}
+                        </td>
 
-                      <td className="px-4 py-3 text-slate-700">
-                        {ev.employee.area || "—"}
-                      </td>
+                        <td className="px-4 py-3 text-slate-700">
+                          {ev.employee?.position || "—"}
+                        </td>
 
-                      <td className="px-4 py-3 text-slate-600">
-                        {formatDate(ev.date)}
-                      </td>
+                        <td className="px-4 py-3 text-slate-700">
+                          {ev.employee?.area || "—"}
+                        </td>
 
-                      <td className="px-4 py-3 text-right tabular-nums text-slate-900">
-                        {ev.totals?.final != null
-                          ? `${ev.totals.final.toFixed(2)}%`
-                          : "—"}
-                      </td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {formatDate(ev.date)}
+                        </td>
 
-                      <td className="px-4 py-3">
-                        <span
-                          className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                            ev.status === "finalized"
-                              ? "bg-emerald-100 text-emerald-900"
-                              : "bg-amber-100 text-amber-900"
-                          }`}
-                        >
-                          {statusLabel(ev.status)}
-                        </span>
-                      </td>
+                        <td className="px-4 py-3 text-right tabular-nums text-slate-900">
+                          {ev.totals?.final != null
+                            ? `${ev.totals.final.toFixed(2)}%`
+                            : "—"}
+                        </td>
 
-                      <td className="px-4 py-3 text-center">
-                        {ev.status === "draft" ? (
-                          <Link
-                            href={`/evaluaciones/${ev._id}`}
-                            className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
+                        <td className="px-4 py-3">
+                          <span
+                            className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                              ev.status === "finalized"
+                                ? "bg-emerald-100 text-emerald-900"
+                                : "bg-amber-100 text-amber-900"
+                            }`}
                           >
-                            Continuar
-                          </Link>
-                        ) : (
-                          <a
-                            href={`/api/evaluations/${ev._id}/pdf`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700"
-                          >
-                            Descargar PDF
-                          </a>
-                        )}
-                      </td>
-                    </tr>
-                  ))
+                            {statusLabel(ev.status)}
+                          </span>
+                        </td>
+
+                        <td className="px-4 py-3 text-center">
+                          {!evaluationId ? (
+                            <span className="text-xs text-slate-400">
+                              Sin ID
+                            </span>
+                          ) : ev.status === "draft" ? (
+                            <Link
+                              href={`/evaluaciones/${evaluationId}`}
+                              className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
+                            >
+                              Continuar
+                            </Link>
+                          ) : (
+                            <a
+                              href={`/api/evaluations/${evaluationId}/pdf`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700"
+                            >
+                              Descargar PDF
+                            </a>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
