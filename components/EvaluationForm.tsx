@@ -96,13 +96,14 @@ export function EvaluationForm() {
     };
   }, [employee, date, sections]);
 
-  const persistDraft = useCallback(async (): Promise<string> => {
-    const payload = {
-      employee,
-      date,
-      status: "draft" as const,
-      sections,
-    };
+  const newId = data.id ?? data._id;
+
+if (!newId) {
+  throw new Error("La API no devolvió el identificador");
+}
+
+setEvaluationId(newId);
+return newId;
 
     if (!evaluationId) {
       const res = await fetch("/api/evaluations", {
