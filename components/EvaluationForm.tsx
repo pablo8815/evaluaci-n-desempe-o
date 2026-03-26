@@ -48,11 +48,36 @@ function Alert({
 type PersistResponse = {
   id?: string;
   _id?: string;
+  evaluation?: {
+    id?: string;
+    _id?: string;
+  };
 };
 
-function extractEvaluationId(data: PersistResponse | Record<string, unknown>): string | undefined {
-  if (typeof data.id === "string" && data.id.trim()) return data.id;
-  if (typeof data._id === "string" && data._id.trim()) return data._id;
+function extractEvaluationId(data: unknown): string | undefined {
+  if (!data || typeof data !== "object") return undefined;
+
+  const value = data as PersistResponse;
+
+  if (typeof value.id === "string" && value.id.trim()) return value.id;
+  if (typeof value._id === "string" && value._id.trim()) return value._id;
+
+  if (value.evaluation && typeof value.evaluation === "object") {
+    if (
+      typeof value.evaluation.id === "string" &&
+      value.evaluation.id.trim()
+    ) {
+      return value.evaluation.id;
+    }
+
+    if (
+      typeof value.evaluation._id === "string" &&
+      value.evaluation._id.trim()
+    ) {
+      return value.evaluation._id;
+    }
+  }
+
   return undefined;
 }
 
@@ -96,14 +121,13 @@ export function EvaluationForm() {
     };
   }, [employee, date, sections]);
 
-  const newId = data.id ?? data._id;
-
-if (!newId) {
-  throw new Error("La API no devolvió el identificador");
-}
-
-setEvaluationId(newId);
-return newId;
+  const persistDraft = useCallback(async (): Promise<string> => {
+    const payload = {
+      employee,
+      date,
+      status: "draft" as const,
+      sections,
+    };
 
     if (!evaluationId) {
       const res = await fetch("/api/evaluations", {
@@ -112,19 +136,24 @@ return newId;
         body: JSON.stringify(payload),
       });
 
-      const data = await res.json().catch(() => ({}));
+      const data: unknown = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        throw new Error(
-          typeof data.error === "string"
-            ? data.error
-            : "No se pudo crear el borrador"
-        );
+        const errorMessage =
+          data &&
+          typeof data === "object" &&
+          "error" in data &&
+          typeof (data as { error?: unknown }).error === "string"
+            ? (data as { error: string }).error
+            : "No se pudo crear el borrador";
+
+        throw new Error(errorMessage);
       }
 
       const newId = extractEvaluationId(data);
 
       if (!newId) {
+        console.error("Respuesta POST /api/evaluations sin id:", data);
         throw new Error("La API no devolvió el identificador del borrador");
       }
 
@@ -138,19 +167,24 @@ return newId;
       body: JSON.stringify(payload),
     });
 
-    const data = await res.json().catch(() => ({}));
+    const data: unknown = await res.json().catch(() => ({}));
 
     if (!res.ok) {
-      throw new Error(
-        typeof data.error === "string"
-          ? data.error
-          : "No se pudo actualizar el borrador"
-      );
+      const errorMessage =
+        data &&
+        typeof data === "object" &&
+        "error" in data &&
+        typeof (data as { error?: unknown }).error === "string"
+          ? (data as { error: string }).error
+          : "No se pudo actualizar el borrador";
+
+      throw new Error(errorMessage);
     }
 
     const updatedId = extractEvaluationId(data) ?? evaluationId;
 
     if (!updatedId) {
+      console.error("Respuesta PUT /api/evaluations/[id] sin id:", data);
       throw new Error("No se pudo conservar el identificador de la evaluación");
     }
 
@@ -163,8 +197,8 @@ return newId;
     setBanner(null);
 
     try {
-      await persistDraft();
-      showOk("Borrador guardado correctamente.");
+      const id = await persistDraft();
+      showOk(`Borrador guardado correctamente. ID: ${id}`);
     } catch (e) {
       showError(e instanceof Error ? e.message : "Error al guardar");
     } finally {
@@ -187,10 +221,16 @@ return newId;
       });
 
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(
-          typeof data.error === "string" ? data.error : "Error al generar PDF"
-        );
+        const data: unknown = await res.json().catch(() => ({}));
+        const errorMessage =
+          data &&
+          typeof data === "object" &&
+          "error" in data &&
+          typeof (data as { error?: unknown }).error === "string"
+            ? (data as { error: string }).error
+            : "Error al generar PDF";
+
+        throw new Error(errorMessage);
       }
 
       const arrayBuffer = await res.arrayBuffer();
@@ -255,12 +295,18 @@ return newId;
         body: JSON.stringify({ id, evaluation }),
       });
 
-      const data = await res.json().catch(() => ({}));
+      const data: unknown = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        throw new Error(
-          typeof data.error === "string" ? data.error : "No se pudo finalizar"
-        );
+        const errorMessage =
+          data &&
+          typeof data === "object" &&
+          "error" in data &&
+          typeof (data as { error?: unknown }).error === "string"
+            ? (data as { error: string }).error
+            : "No se pudo finalizar";
+
+        throw new Error(errorMessage);
       }
 
       resetForm();
