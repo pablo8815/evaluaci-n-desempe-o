@@ -127,6 +127,14 @@ export function EvaluationForm({
     setEvaluationId(undefined);
   }, []);
 
+  const waitForStateFlush = useCallback(
+    () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => resolve());
+      }),
+    []
+  );
+
   const buildDocumentForPdf = useCallback((): EvaluationDocument => {
     return {
       employee,
@@ -213,6 +221,7 @@ export function EvaluationForm({
     setBanner(null);
 
     try {
+      await waitForStateFlush();
       const id = await persistDraft();
       showOk(`Borrador guardado correctamente. ID: ${id}`);
     } catch (e) {
@@ -227,6 +236,7 @@ export function EvaluationForm({
     setBanner(null);
 
     try {
+      await waitForStateFlush();
       const doc = buildDocumentForPdf();
 
       const res = await fetch("/api/evaluations/pdf", {
@@ -292,6 +302,7 @@ export function EvaluationForm({
     setBanner(null);
 
     try {
+      await waitForStateFlush();
       const id = await persistDraft();
 
       if (!id) {
@@ -371,7 +382,9 @@ export function EvaluationForm({
             INNOVA
           </p>
           <h1 className="mt-1 text-2xl font-bold text-slate-900 sm:text-3xl">
-            {evaluationId ? "Editar evaluación de desempeño" : "Nueva evaluación de desempeño"}
+            {evaluationId
+              ? "Editar evaluación de desempeño"
+              : "Nueva evaluación de desempeño"}
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-slate-600">
             Captura manual del instrumento. Los totales se calculan en tiempo real;
