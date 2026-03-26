@@ -8,6 +8,8 @@ import {
 import type { EvaluationPayload } from "@/types/evaluation";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function GET() {
   try {
@@ -19,9 +21,18 @@ export async function GET() {
       .sort({ createdAt: -1 })
       .toArray();
 
-    return NextResponse.json({
-      evaluations: rows.map((row) => evaluationToClient(row)),
-    });
+    return NextResponse.json(
+      {
+        evaluations: rows.map((row) => evaluationToClient(row)),
+      },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
+        },
+      }
+    );
   } catch (e) {
     console.error("GET /api/evaluations error:", e);
 
@@ -30,7 +41,14 @@ export async function GET() {
 
     return NextResponse.json(
       { error: message, evaluations: [] },
-      { status: 500 }
+      {
+        status: 500,
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
+        },
+      }
     );
   }
 }
@@ -92,6 +110,11 @@ export async function POST(request: Request) {
 
     return NextResponse.json(evaluationToClient(created), {
       status: 201,
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+        Pragma: "no-cache",
+        Expires: "0",
+      },
     });
   } catch (e) {
     console.error("POST /api/evaluations error:", e);
@@ -101,7 +124,14 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       { error: message },
-      { status: 500 }
+      {
+        status: 500,
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
+        },
+      }
     );
   }
 }

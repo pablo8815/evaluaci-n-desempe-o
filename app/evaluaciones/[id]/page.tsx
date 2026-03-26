@@ -2,6 +2,9 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { EvaluationForm } from "@/components/EvaluationForm";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 async function getBaseUrl() {
   const h = await headers();
   const host = h.get("host");
@@ -19,8 +22,10 @@ async function getBaseUrl() {
 async function getEvaluation(id: string) {
   const baseUrl = await getBaseUrl();
 
-  const res = await fetch(`${baseUrl}/api/evaluations/${id}`, {
+  const res = await fetch(`${baseUrl}/api/evaluations/${id}?ts=${Date.now()}`, {
+    method: "GET",
     cache: "no-store",
+    next: { revalidate: 0 },
   });
 
   if (!res.ok) {
