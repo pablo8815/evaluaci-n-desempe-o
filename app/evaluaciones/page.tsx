@@ -27,14 +27,17 @@ export default function EvaluacionesListPage() {
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
+
     try {
       const res = await fetch("/api/evaluations");
       const data = await res.json();
+
       if (!res.ok) {
         throw new Error(
-          typeof data.error === "string" ? data.error : "Error al cargar",
+          typeof data.error === "string" ? data.error : "Error al cargar"
         );
       }
+
       setRows(data.evaluations ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar evaluaciones");
@@ -61,6 +64,7 @@ export default function EvaluacionesListPage() {
             Listado de evaluaciones registradas en la base de datos.
           </p>
         </div>
+
         <div className="flex flex-wrap gap-3">
           <button
             type="button"
@@ -69,6 +73,7 @@ export default function EvaluacionesListPage() {
           >
             Actualizar
           </button>
+
           <Link
             href="/evaluaciones/nueva"
             className="inline-flex items-center justify-center rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-slate-800"
@@ -99,13 +104,15 @@ export default function EvaluacionesListPage() {
                   <th className="px-4 py-3">Fecha</th>
                   <th className="px-4 py-3 text-right">Calificación final</th>
                   <th className="px-4 py-3">Estado</th>
+                  <th className="px-4 py-3 text-center">Acciones</th>
                 </tr>
               </thead>
+
               <tbody className="divide-y divide-slate-100">
                 {loading ? (
                   <tr>
                     <td
-                      colSpan={6}
+                      colSpan={7}
                       className="px-4 py-10 text-center text-slate-500"
                     >
                       Cargando…
@@ -114,7 +121,7 @@ export default function EvaluacionesListPage() {
                 ) : rows.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={6}
+                      colSpan={7}
                       className="px-4 py-10 text-center text-slate-500"
                     >
                       No hay evaluaciones guardadas aún.{" "}
@@ -133,20 +140,25 @@ export default function EvaluacionesListPage() {
                       <td className="px-4 py-3 font-medium text-slate-900">
                         {ev.employee.name || "—"}
                       </td>
+
                       <td className="px-4 py-3 text-slate-700">
                         {ev.employee.position || "—"}
                       </td>
+
                       <td className="px-4 py-3 text-slate-700">
                         {ev.employee.area || "—"}
                       </td>
+
                       <td className="px-4 py-3 text-slate-600">
                         {formatDate(ev.date)}
                       </td>
+
                       <td className="px-4 py-3 text-right tabular-nums text-slate-900">
                         {ev.totals?.final != null
                           ? `${ev.totals.final.toFixed(2)}%`
                           : "—"}
                       </td>
+
                       <td className="px-4 py-3">
                         <span
                           className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
@@ -157,6 +169,26 @@ export default function EvaluacionesListPage() {
                         >
                           {statusLabel(ev.status)}
                         </span>
+                      </td>
+
+                      <td className="px-4 py-3 text-center">
+                        {ev.status === "draft" ? (
+                          <Link
+                            href={`/evaluaciones/${ev._id}`}
+                            className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
+                          >
+                            Continuar
+                          </Link>
+                        ) : (
+                          <a
+                            href={`/api/evaluations/${ev._id}/pdf`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700"
+                          >
+                            Descargar PDF
+                          </a>
+                        )}
                       </td>
                     </tr>
                   ))

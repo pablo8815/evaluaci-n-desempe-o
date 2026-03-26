@@ -54,6 +54,11 @@ type PersistResponse = {
   };
 };
 
+type EvaluationFormInitialData = EvaluationDocument & {
+  id?: string;
+  _id?: string;
+};
+
 function extractEvaluationId(data: unknown): string | undefined {
   if (!data || typeof data !== "object") return undefined;
 
@@ -81,18 +86,29 @@ function extractEvaluationId(data: unknown): string | undefined {
   return undefined;
 }
 
-export function EvaluationForm() {
-  const initial = useMemo(() => createEmptyEvaluationDraft(), []);
+export function EvaluationForm({
+  initialData,
+}: {
+  initialData?: EvaluationFormInitialData | null;
+}) {
+  const initial = useMemo(
+    () => initialData ?? createEmptyEvaluationDraft(),
+    [initialData]
+  );
+
   const [employee, setEmployee] = useState<EmployeeInfo>(initial.employee);
   const [date, setDate] = useState(initial.date);
   const [sections, setSections] = useState(initial.sections);
-  const [evaluationId, setEvaluationId] = useState<string | undefined>();
+  const [evaluationId, setEvaluationId] = useState<string | undefined>(
+    initialData?.id ?? initialData?._id
+  );
   const [loading, setLoading] = useState(false);
   const [banner, setBanner] = useState<{
     type: "ok" | "err";
     text: string;
   } | null>(null);
 
+  const isFinalized = initialData?.status === "finalized";
   const totals = useMemo(() => computeTotals(sections), [sections]);
 
   const showError = useCallback((text: string) => {
@@ -355,7 +371,7 @@ export function EvaluationForm() {
             INNOVA
           </p>
           <h1 className="mt-1 text-2xl font-bold text-slate-900 sm:text-3xl">
-            Nueva evaluación de desempeño
+            {evaluationId ? "Editar evaluación de desempeño" : "Nueva evaluación de desempeño"}
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-slate-600">
             Captura manual del instrumento. Los totales se calculan en tiempo real;
@@ -389,7 +405,7 @@ export function EvaluationForm() {
           <button
             type="button"
             className={btnPrimary}
-            disabled={loading}
+            disabled={loading || isFinalized}
             onClick={() => void onSaveDraft()}
           >
             Guardar borrador
@@ -407,7 +423,7 @@ export function EvaluationForm() {
           <button
             type="button"
             className={btnAccent}
-            disabled={loading}
+            disabled={loading || isFinalized}
             onClick={() => void onFinalize()}
           >
             Finalizar y limpiar
@@ -415,7 +431,7 @@ export function EvaluationForm() {
 
           {evaluationId ? (
             <span className="self-center text-xs text-slate-500">
-              Borrador:{" "}
+              ID:{" "}
               <code className="rounded bg-slate-100 px-1 py-0.5">
                 {evaluationId}
               </code>
