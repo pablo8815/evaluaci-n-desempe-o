@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { clampCompliance, computeTotals } from "@/lib/calculations";
 import { collaboratorSlugForFilename } from "@/lib/collaborator-filename";
 import { createEmptyEvaluationDraft } from "@/lib/evaluation-helpers";
@@ -47,6 +47,14 @@ type EvaluationFormInitialData = EvaluationDocument & {
   _id?: string;
 };
 
+type EmployeeOption = {
+  id: string;
+  nombre: string;
+  puesto: string;
+  area: string;
+  email?: string;
+};
+
 export function EvaluationForm({
   initialData,
 }: {
@@ -66,8 +74,120 @@ export function EvaluationForm({
     text: string;
   } | null>(null);
 
+  const [employeeOptions, setEmployeeOptions] = useState<EmployeeOption[]>([]);
+  const [employeesLoading, setEmployeesLoading] = useState(false);
+  const [employeesError, setEmployeesError] = useState<string | null>(null);
+
   const isFinalized = initialData?.status === "finalized";
   const totals = useMemo(() => computeTotals(sections), [sections]);
+
+  useEffect(() => {
+    let ignore = false;
+
+    async function loadEmployees() {
+      try {
+        setEmployeesLoading(true);
+        setEmployeesError(null);
+
+        const res = await fetch("/api/employees", {
+          method: "GET",
+          cache: "no-store",
+        });
+
+        const data: unknown = await res.json().catch(() => []);
+
+        if (!res.ok) {
+          const errorMessage =
+            data &&
+            typeof data === "object" &&
+            "error" in data &&
+            typeof (data as { error?: unknown }).error === "string"
+              ? (data as { error: string }).error
+              : "No se pudo cargar la lista de colaboradores";
+
+          throw new Error(errorMessage);
+        }
+
+        if (!Array.isArray(data)) {
+          throw new Error("La respuesta de empleados no tiene el formato esperado");
+        }
+
+        const normalized: EmployeeOption[] = data
+          .map((item) => {
+            if (!item || typeof item !== "object") return null;
+
+            const row = item as Record<string, unknown>;
+
+            return {
+              id: String(row.id ?? ""),
+              nombre: String(row.nombre ?? ""),
+              puesto: String(row.puesto ?? ""),
+              area: String(row.area ?? ""),
+              email: row.email ? String(row.email) : "",
+            };
+          })
+          .filter(
+            (item): item is EmployeeOption =>
+              !!item && !!item.id && !!item.nombre
+          );
+
+        if (!ignore) {
+          setEmployeeOptions(normalized);
+        }
+      } catch (error) {
+        if (!ignore) {
+          setEmployeesError(
+            error instanceof Error
+              ? error.message
+              : "Error al cargar colaboradores"
+          );
+        }
+      } finally {
+        if (!ignore) {
+          setEmployeesLoading(false);
+        }
+      }
+    }
+
+    void loadEmployees();
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  const selectedEmployeeId = useMemo(() => {
+    const match = employeeOptions.find(
+      (option) =>
+        option.nombre.trim().toLowerCase() === employee.name.trim().toLowerCase()
+    );
+
+    return match?.id ?? "";
+  }, [employee.name, employeeOptions]);
+
+  const handleEmployeeSelect = useCallback(
+    (employeeId: string) => {
+      const selected = employeeOptions.find((item) => item.id === employeeId);
+
+      if (!selected) {
+        setEmployee((prev) => ({
+          ...prev,
+          name: "",
+          position: "",
+          area: "",
+        }));
+        return;
+      }
+
+      setEmployee((prev) => ({
+        ...prev,
+        name: selected.nombre,
+        position: selected.puesto,
+        area: selected.area,
+      }));
+    },
+    [employeeOptions]
+  );
 
   const showError = useCallback((text: string) => {
     setBanner({ type: "err", text });
@@ -93,7 +213,9 @@ export function EvaluationForm({
   );
 
   const buildDocumentForPdf = useCallback(
-    (status: EvaluationDocument["status"] = "finalized"): EvaluationDocument => {
+    (
+      status: EvaluationDocument["status"] = "finalized"
+    ): EvaluationDocument => {
       return {
         employee,
         date,
@@ -252,8 +374,8 @@ export function EvaluationForm({
             Nueva evaluación de desempeño
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-slate-600">
-            Captura manual del instrumento. Los totales se calculan en tiempo real;
-            puedes generar el PDF y finalizar cuando esté completa.
+            Captura manual del instrumento. Los totales se calculan en tiempo
+            real; puedes generar el PDF y finalizar cuando esté completa.
           </p>
         </div>
 
@@ -268,11 +390,21 @@ export function EvaluationForm({
       <div className="mt-8 space-y-8">
         {banner ? <Alert type={banner.type}>{banner.text}</Alert> : null}
 
+        {employeesError ? (
+          <Alert type="err">
+            No se pudo cargar la lista de colaboradores: {employeesError}
+          </Alert>
+        ) : null}
+
         <TotalsCards totals={totals} />
 
         <EvaluationHeader
           employee={employee}
           date={date}
+          employeeOptions={employeeOptions}
+          selectedEmployeeId={selectedEmployeeId}
+          employeesLoading={employeesLoading}
+          onEmployeeSelect={handleEmployeeSelect}
           onEmployeeChange={(field, value) =>
             setEmployee((prev) => ({ ...prev, [field]: value }))
           }
