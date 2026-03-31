@@ -128,14 +128,19 @@ export async function GET() {
         ]);
 
         const area = firstField(f, [
-      "area",
-      "Area",
-      "AREA",
-      "Departamento",
-      "departamento",
-      "Department",
-      "department",
-      "Departamento_x0020_o_x0020_direcci_x00f3_n",
+          "area",
+          "Area",
+          "AREA",
+          "Departamento",
+          "departamento",
+          "Department",
+          "department",
+          "Departamento_x0020_o_x0020_direcci_x00f3_n",
+          "Area_x0020_de_x0020_trabajo",
+          "area_x0020_de_x0020_trabajo",
+          "field_3",
+          "field_4",
+          "field_5",
         ]);
 
         const email = firstField(f, [
@@ -155,7 +160,10 @@ export async function GET() {
       .filter((row) => row.id !== "" && row.nombre !== "")
       .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
 
-      return NextResponse.json(spData?.value?.[0]?.fields ?? {});
+    return NextResponse.json({
+      data: employees,
+      debug: spData?.value?.[0]?.fields ?? {},
+    });
   } catch (error) {
     return NextResponse.json(
       {
