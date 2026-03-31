@@ -89,7 +89,7 @@ export async function GET() {
     }
 
     const spRes = await fetch(
-      `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items?$expand=fields($select=Title,Usuario,NombreCompleto,Nombre,Apellido,Puesto,Cargo,jobTitle,JobTitle,Puesto_x0020_del_x0020_trabajo,area,Area,AREA,Departamento,departamento,Department,department,Departamento_x0020_o_x0020_direcci_x00f3_n,Area_x0020_de_x0020_trabajo,area_x0020_de_x0020_trabajo,field_3,field_4,field_5,Email,Nombreprincipaldeusuario,Nombre_x0020_principal_x0020_de_x0020_usuario)`,
+      `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items?expand=fields($select=Title,Usuario,NombreCompleto,Puesto,Area,Email)`,
       {
         headers: {
           Authorization: `Bearer ${tokenData.access_token}`,
