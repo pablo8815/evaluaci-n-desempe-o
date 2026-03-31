@@ -30,6 +30,13 @@ function toText(value: unknown): string {
   return String(value).trim();
 }
 
+function normalizeKey(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/_x[0-9a-f]{4}_/gi, "")
+    .replace(/[^a-z0-9]/gi, "");
+}
+
 function firstField(
   fields: Record<string, unknown>,
   candidates: string[]
@@ -38,6 +45,18 @@ function firstField(
     const value = toText(fields[key]);
     if (value) return value;
   }
+
+  const entries = Object.entries(fields);
+  const normalizedCandidates = candidates.map(normalizeKey);
+
+  for (const [realKey, realValue] of entries) {
+    const normalizedRealKey = normalizeKey(realKey);
+    if (normalizedCandidates.includes(normalizedRealKey)) {
+      const value = toText(realValue);
+      if (value) return value;
+    }
+  }
+
   return "";
 }
 
@@ -51,9 +70,7 @@ export async function GET() {
 
     if (!tenantId || !clientId || !clientSecret || !siteId || !listId) {
       return NextResponse.json(
-        {
-          error: "Faltan variables de entorno para Azure/SharePoint",
-        },
+        { error: "Faltan variables de entorno para Azure/SharePoint" },
         { status: 500 }
       );
     }
@@ -116,8 +133,12 @@ export async function GET() {
         const f = item.fields ?? {};
 
         const nombre =
-          firstField(f, ["Usuario", "Title", "NombreCompleto"]) ||
-          `${firstField(f, ["Nombre"])} ${firstField(f, ["Apellido"])}`.trim();
+          firstField(f, [
+            "Usuario",
+            "Title",
+            "NombreCompleto",
+            "Nombre Apellido",
+          ]) || `${firstField(f, ["Nombre"])} ${firstField(f, ["Apellido"])}`.trim();
 
         const puesto = firstField(f, [
           "Puesto",
@@ -130,11 +151,14 @@ export async function GET() {
         const area = firstField(f, [
           "area",
           "Area",
-          "AREA",
+          "área",
+          "Área",
           "Departamento",
           "departamento",
           "Department",
           "department",
+          "AreaTrabajo",
+          "Area_de_trabajo",
           "Departamento_x0020_o_x0020_direcci_x00f3_n",
         ]);
 
