@@ -152,7 +152,7 @@ export async function GET() {
       .filter((row) => row.id !== "" && row.nombre !== "")
       .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
 
-    return NextResponse.json(employees);
+      return NextResponse.json(spData?.value?.[0]?.fields ?? {});
   } catch (error) {
     return NextResponse.json(
       {
