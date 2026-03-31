@@ -128,10 +128,14 @@ export async function GET() {
         ]);
 
         const area = firstField(f, [
-          "Departamento",
+          "area",
           "Area",
-          "Department",
+          "AREA",
+          "Departamento",
           "departamento",
+          "Department",
+          "department",
+          "Departamento_x0020_o_x0020_direcci_x00f3_n",
           "Departamento_x0020_o_x0020_direcci_x00f3_n",
         ]);
 
