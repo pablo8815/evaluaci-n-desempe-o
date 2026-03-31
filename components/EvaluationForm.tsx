@@ -55,6 +55,12 @@ type EmployeeOption = {
   email?: string;
 };
 
+type EmployeesApiResponse = {
+  data?: unknown[];
+  debug?: Record<string, unknown>;
+  error?: string;
+};
+
 export function EvaluationForm({
   initialData,
 }: {
@@ -94,25 +100,31 @@ export function EvaluationForm({
           cache: "no-store",
         });
 
-        const data: unknown = await res.json().catch(() => []);
+        const responseData: unknown = await res
+          .json()
+          .catch(() => ({ data: [] } satisfies EmployeesApiResponse));
 
         if (!res.ok) {
           const errorMessage =
-            data &&
-            typeof data === "object" &&
-            "error" in data &&
-            typeof (data as { error?: unknown }).error === "string"
-              ? (data as { error: string }).error
+            responseData &&
+            typeof responseData === "object" &&
+            "error" in responseData &&
+            typeof (responseData as { error?: unknown }).error === "string"
+              ? (responseData as { error: string }).error
               : "No se pudo cargar la lista de colaboradores";
 
           throw new Error(errorMessage);
         }
 
-        if (!Array.isArray(data)) {
-          throw new Error("La respuesta de empleados no tiene el formato esperado");
-        }
+        const realData =
+          responseData &&
+          typeof responseData === "object" &&
+          "data" in responseData &&
+          Array.isArray((responseData as EmployeesApiResponse).data)
+            ? ((responseData as EmployeesApiResponse).data as unknown[])
+            : [];
 
-        const normalized = data
+        const normalized = realData
           .map((item): EmployeeOption | null => {
             if (!item || typeof item !== "object") return null;
 
