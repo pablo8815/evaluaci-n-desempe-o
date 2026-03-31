@@ -1,7 +1,3 @@
-por $select, y no elimine todos los registros si nombre viene vacío en otro campo.
-
-Usa esta versión completa en app/api/employees/route.ts:
-
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -92,7 +88,6 @@ export async function GET() {
       );
     }
 
-    // Se trae fields completo para evitar errores por nombres internos distintos
     const spRes = await fetch(
       `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items?expand=fields`,
       {
@@ -121,15 +116,7 @@ export async function GET() {
         const f = item.fields ?? {};
 
         const nombre =
-          firstField(f, [
-            "Title",
-            "Usuario",
-            "NombreCompleto",
-            "Nombre_x0020_completo",
-            "Nombre",
-            "FullName",
-            "fullName",
-          ]) ||
+          firstField(f, ["Usuario", "Title", "NombreCompleto"]) ||
           `${firstField(f, ["Nombre"])} ${firstField(f, ["Apellido"])}`.trim();
 
         const puesto = firstField(f, [
@@ -138,40 +125,20 @@ export async function GET() {
           "jobTitle",
           "JobTitle",
           "Puesto_x0020_del_x0020_trabajo",
-          "Puesto_x0020_de_x0020_trabajo",
-          "field_1",
-          "field_2",
-          "field_3",
-          "field_4",
         ]);
 
         const area = firstField(f, [
-          "Area",
-          "area",
-          "AREA",
           "Departamento",
-          "departamento",
+          "Area",
           "Department",
-          "department",
+          "departamento",
           "Departamento_x0020_o_x0020_direcci_x00f3_n",
-          "Area_x0020_de_x0020_trabajo",
-          "area_x0020_de_x0020_trabajo",
-          "field_3",
-          "field_4",
-          "field_5",
         ]);
 
         const email = firstField(f, [
           "Email",
-          "EMail",
-          "Correo",
-          "correo",
-          "mail",
           "Nombreprincipaldeusuario",
           "Nombre_x0020_principal_x0020_de_x0020_usuario",
-          "field_5",
-          "field_6",
-          "field_7",
         ]);
 
         return {
@@ -182,14 +149,10 @@ export async function GET() {
           email,
         };
       })
-      .filter((row) => row.id !== "")
+      .filter((row) => row.id !== "" && row.nombre !== "")
       .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
 
-    return NextResponse.json({
-      data: employees,
-      total: employees.length,
-      debug: spData?.value?.[0]?.fields ?? {},
-    });
+    return NextResponse.json(employees);
   } catch (error) {
     return NextResponse.json(
       {
