@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { clampCompliance, computeTotals } from "@/lib/calculations";
 import { collaboratorSlugForFilename } from "@/lib/collaborator-filename";
 import { createEmptyEvaluationDraft } from "@/lib/evaluation-helpers";
@@ -25,7 +25,7 @@ function Alert({
   children,
 }: {
   type: "ok" | "err";
-  children: ReactNode;
+  children: React.ReactNode;
 }) {
   const styles =
     type === "ok"
@@ -53,12 +53,6 @@ type EmployeeOption = {
   puesto: string;
   area: string;
   email?: string;
-};
-
-type EmployeesApiResponse = {
-  data?: unknown[];
-  debug?: Record<string, unknown>;
-  error?: string;
 };
 
 export function EvaluationForm({
@@ -100,49 +94,44 @@ export function EvaluationForm({
           cache: "no-store",
         });
 
-        const responseData: unknown = await res
-          .json()
-          .catch(() => ({ data: [] } satisfies EmployeesApiResponse));
+        const data: unknown = await res.json().catch(() => []);
 
         if (!res.ok) {
           const errorMessage =
-            responseData &&
-            typeof responseData === "object" &&
-            "error" in responseData &&
-            typeof (responseData as { error?: unknown }).error === "string"
-              ? (responseData as { error: string }).error
+            data &&
+            typeof data === "object" &&
+            "error" in data &&
+            typeof (data as { error?: unknown }).error === "string"
+              ? (data as { error: string }).error
               : "No se pudo cargar la lista de colaboradores";
 
           throw new Error(errorMessage);
         }
 
-        const realData =
-          responseData &&
-          typeof responseData === "object" &&
-          "data" in responseData &&
-          Array.isArray((responseData as EmployeesApiResponse).data)
-            ? ((responseData as EmployeesApiResponse).data as unknown[])
-            : [];
+        if (!Array.isArray(data)) {
+          throw new Error(
+            "La respuesta de empleados no tiene el formato esperado"
+          );
+        }
 
-        const normalized = realData
+        const normalized = data
           .map((item): EmployeeOption | null => {
             if (!item || typeof item !== "object") return null;
 
             const row = item as Record<string, unknown>;
 
-            const option: EmployeeOption = {
+            return {
               id: String(row.id ?? ""),
               nombre: String(row.nombre ?? ""),
               puesto: String(row.puesto ?? ""),
               area: String(row.area ?? ""),
               email: row.email ? String(row.email) : "",
             };
-
-            if (!option.id || !option.nombre) return null;
-
-            return option;
           })
-          .filter((item): item is EmployeeOption => item !== null);
+          .filter(
+            (item): item is EmployeeOption =>
+              item !== null && !!item.id && !!item.nombre
+          );
 
         if (!ignore) {
           setEmployeeOptions(normalized);
@@ -450,7 +439,7 @@ export function EvaluationForm({
               key={section.id}
               section={section}
               sectionIndex={sectionIndex}
-              subtotal={totals[section.id as keyof typeof totals] ?? 0}
+              subtotal={totals[section.id]}
               onItemChange={onItemChange}
             />
           ))}
