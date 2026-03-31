@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { clampCompliance, computeTotals } from "@/lib/calculations";
 import { collaboratorSlugForFilename } from "@/lib/collaborator-filename";
 import { createEmptyEvaluationDraft } from "@/lib/evaluation-helpers";
@@ -25,7 +25,7 @@ function Alert({
   children,
 }: {
   type: "ok" | "err";
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   const styles =
     type === "ok"
@@ -112,24 +112,25 @@ export function EvaluationForm({
           throw new Error("La respuesta de empleados no tiene el formato esperado");
         }
 
-        const normalized: EmployeeOption[] = data
-          .map((item) => {
+        const normalized = data
+          .map((item): EmployeeOption | null => {
             if (!item || typeof item !== "object") return null;
 
             const row = item as Record<string, unknown>;
 
-            return {
+            const option: EmployeeOption = {
               id: String(row.id ?? ""),
               nombre: String(row.nombre ?? ""),
               puesto: String(row.puesto ?? ""),
               area: String(row.area ?? ""),
               email: row.email ? String(row.email) : "",
             };
+
+            if (!option.id || !option.nombre) return null;
+
+            return option;
           })
-          .filter(
-            (item): item is EmployeeOption =>
-              !!item && !!item.id && !!item.nombre
-          );
+          .filter((item): item is EmployeeOption => item !== null);
 
         if (!ignore) {
           setEmployeeOptions(normalized);
@@ -437,7 +438,7 @@ export function EvaluationForm({
               key={section.id}
               section={section}
               sectionIndex={sectionIndex}
-              subtotal={totals[section.id]}
+              subtotal={totals[section.id as keyof typeof totals] ?? 0}
               onItemChange={onItemChange}
             />
           ))}
